@@ -86,12 +86,11 @@ class VectorClassBuilder:
             self.write(self.typeName, " dot (", self.getTypeNameArg(dim), " other) const;", shift=1)
 
             # --- Swizzling ---
-            if True:
-                for resultdim in range(2, self.dimensions+1):
-                    for axies in product(range(1, dim+1), repeat=resultdim):
-                        self.write(self.getTypeName(resultdim), ' ',
-                                *map(self.axis, axies), "();", shift=1)
-                    self.write()
+            for resultdim in range(2, self.dimensions+1):
+                for axies in product(range(1, dim+1), repeat=resultdim):
+                    self.write(self.getTypeName(resultdim), ' ',
+                            *map(self.axis, axies), "() const;", shift=1)
+                self.write()
 
             self.write("};", newlines=2)
             # --- Out ---
@@ -216,6 +215,13 @@ class VectorClassBuilder:
             self.write('}', newlines=2)
 
             # --- Swizzling ---
+            for resultdim in range(2, self.dimensions+1):
+                for axies in product(range(1, dim+1), repeat=resultdim):
+                    self.write(self.getTypeName(resultdim), ' ',
+                            *map(self.axis, axies), "() const { ", newlines=0)
+                    self.write("return ", self.getTypeName(resultdim), '(', newlines=0)
+                    self.write(', '.join(map(self.axis, axies)), '); }')
+            
             # --- Out ---
             self.write(self.getTypeName(dim), " operator * (", 
                             self.typeName, " scalar, ", self.getTypeNameArg(dim), " vec) {", shift=0)
