@@ -46,8 +46,8 @@ class Builder(ABC):
     def format(self) -> str:
         return ''.join(self._buffer)
 
-    def write(self, *text: str, newlines: int = 1) -> None:
-        if self._shift != 0 and self._do_shift: self._buffer.append(' ' * (self.ctx.tab_size * self._shift))
+    def write(self, *text: str, newlines: int = 1, shift: int = 0) -> None:
+        if self._shift+shift != 0 and self._do_shift: self._buffer.append(' ' * (self.ctx.tab_size * (self._shift+shift)))
         self._buffer.extend(text)
         if newlines != 0: self._buffer.append('\n' * newlines)
         self._do_shift = newlines > 0
@@ -90,9 +90,7 @@ class ImplBuilder(Builder):
             self.write(self.ctx.type_name(d), " ", self.ctx.type_name(d), "::operator ", op, " (", 
                         self.ctx.const_type_name(d), " other) const {")
             
-            self.shift(1)
-            self.write("return ", self.ctx.type_name(d), "(", newlines=0)
-            self.shift(-1)
+            self.write("return ", self.ctx.type_name(d), "(", shift=1, newlines=0)
             for i in range(d-1):
                 self.write("this->", self.ctx.axis(i), ' ', op, " other.", self.ctx.axis(i), ', ', newlines=0)
             self.write("this->", self.ctx.axis(d-1), ' ', op, " other.", self.ctx.axis(d-1), ");")
@@ -114,9 +112,7 @@ class ImplBuilder(Builder):
             self.write("bool ", self.ctx.type_name(d), "::operator ", op, "= (", 
                         self.ctx.const_type_name(d), " other) const {")
             
-            self.shift(1)
-            self.write("return ", newlines=0)
-            self.shift(-1)
+            self.write("return ", shift=1, newlines=0)
             for i in range(d-1):
                 self.write("this->", self.ctx.axis(i), ' ', op, "= other.", self.ctx.axis(i), ' ', l_op, ' ', newlines=0)
             self.write("this->", self.ctx.axis(d-1), ' ', op, "= other.", self.ctx.axis(d-1), ';')
@@ -160,24 +156,19 @@ class ImplBuilder(Builder):
 
 
         self.write(self.ctx.type_name(d), ' ', self.ctx.type_name(d), "::normalized() const {")
-        self.shift(1)
-        self.write("return *this / this->mag();")
-        self.shift(-1)
+        self.write("return *this / this->mag();", shift=1)
         self.write('}', newlines=2)
 
         self.write(self.ctx.type_name(d), '& ', self.ctx.type_name(d), "::normalize() {")
-        self.shift(1)
-        self.write("*this /= this->mag();")
-        self.write("return *this;")
-        self.shift(-1)
+        self.write("*this /= this->mag();", shift=1)
+        self.write("return *this;", shift=1)
         self.write('}', newlines=2)
 
         self.write(self.ctx.scalar_type, " ", self.ctx.type_name(d), "::dot (", 
                         self.ctx.const_type_name(d), " other) const {")
         
-        self.shift(1)
-        self.write("return ", newlines=0)
-        self.shift(-1)
+        self.write("return ", newlines=0, shift=1)
+
         for i in range(d-1):
             self.write("this->", self.ctx.axis(i), '*other.', self.ctx.axis(i), ' + ', newlines=0)
         self.write("this->", self.ctx.axis(d-1), '*other.', self.ctx.axis(d-1), ';')
@@ -190,6 +181,7 @@ class ImplBuilder(Builder):
                         *map(self.ctx.axis, axies), "() const { ", newlines=0)
                 self.write("return ", self.ctx.type_name(resultdim), '(', newlines=0)
                 self.write(', '.join(map(self.ctx.axis, axies)), '); }')
+            self.write()
 
     def build(self) -> None:
         self.write('#include "hahaha"')
@@ -203,10 +195,8 @@ class ImplBuilder(Builder):
             
             self.write(self.ctx.type_name(d), " operator * (", 
                             self.ctx.scalar_type, " scalar, ", self.ctx.const_type_name(d), " vec) {")
-            self.shift(1)
-            self.write("return vec * scalar;")
-            self.shift(-1)
-            self.write('}', newlines=2)
+            self.write("return vec * scalar;", shift=1)
+            self.write('}')
 
 
 class HeaderBuilder(Builder):
@@ -223,7 +213,7 @@ class HeaderBuilder(Builder):
             axes = self.ctx.axes[acc:acc+subdims[-1]]
             self.write(self.ctx.const_type_name(subdims[-1]), ' ', axes, ');')
         
-        self.write(newlines=1)
+        self.write()
 
     def writeAlgebra(self, d: int) -> None:
         for op in '+', '-':
@@ -242,13 +232,14 @@ class HeaderBuilder(Builder):
             self.write(self.ctx.type_name(d), "& operator ", op,
                         "= (", self.ctx.scalar_type, " scalar);")
 
-        self.write(newlines=1)
+        self.write()
 
     def writeMethods(self, d: int) -> None:
         self.write(self.ctx.scalar_type, " mag() const;")
         self.write(self.ctx.type_name(d), " normalized() const;")
         self.write(self.ctx.type_name(d), "& normalize();")
         self.write(self.ctx.scalar_type, " dot (", self.ctx.const_type_name(d), " other) const;")
+        self.write()
 
     def writeSwizzling(self, d: int) -> None:
         for resultdim in range(2, self.ctx.dimensions+1):
@@ -276,7 +267,7 @@ class HeaderBuilder(Builder):
 
             self.write(self.ctx.type_name(dim), " operator*(", self.ctx.scalar_type,
                        " scalar, ", self.ctx.const_type_name(dim), " vec);")
-            self.write(newlines=1)
+            self.write()
 
 
 def compositions(n: int) -> Iterator[list[int]]:
